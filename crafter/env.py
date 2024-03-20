@@ -80,7 +80,8 @@ class Env(BaseClass):
     self._last_health = self._player.health
     self._world.add(self._player)
     self._unlocked = set()
-    worldgen.generate_world(self._world, self._player, self._zombie_spawn_prob, self._skeleton_spawn_prob)
+    worldgen.generate_world(self._world, self._player,
+                            self._zombie_spawn_prob, self._skeleton_spawn_prob)
     return self._obs()
 
   def step(self, action):
