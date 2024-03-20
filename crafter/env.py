@@ -26,7 +26,8 @@ class Env(BaseClass):
 
   def __init__(
       self, area=(64, 64), view=(9, 9), size=(64, 64),
-      reward=True, length=10000, seed=None):
+      reward=True, length=10000, seed=None,
+      zombie_spawn_prob=0.3, skeleton_spawn_prob=0.1):
     view = np.array(view if hasattr(view, '__len__') else (view, view))
     size = np.array(size if hasattr(size, '__len__') else (size, size))
     seed = np.random.randint(0, 2**31 - 1) if seed is None else seed
@@ -37,6 +38,8 @@ class Env(BaseClass):
     self._length = length
     self._seed = seed
     self._episode = 0
+    self._zombie_spawn_prob = zombie_spawn_prob
+    self._skeleton_spawn_prob = skeleton_spawn_prob
     self._world = engine.World(area, constants.materials, (12, 12))
     self._textures = engine.Textures(constants.root / 'assets')
     item_rows = int(np.ceil(len(constants.items) / view[0]))
@@ -77,7 +80,7 @@ class Env(BaseClass):
     self._last_health = self._player.health
     self._world.add(self._player)
     self._unlocked = set()
-    worldgen.generate_world(self._world, self._player)
+    worldgen.generate_world(self._world, self._player, self._zombie_spawn_prob, self._skeleton_spawn_prob)
     return self._obs()
 
   def step(self, action):
@@ -141,12 +144,12 @@ class Env(BaseClass):
   def _balance_chunk(self, chunk, objs):
     light = self._world.daylight
     self._balance_object(
-        chunk, objs, objects.Zombie, 'grass', 6, 0, 0.3, 0.4,
+        chunk, objs, objects.Zombie, 'grass', 6, 0, self._zombie_spawn_prob, 0.4,
         lambda pos: objects.Zombie(self._world, pos, self._player),
         lambda num, space: (
             0 if space < 50 else 3.5 - 3 * light, 3.5 - 3 * light))
     self._balance_object(
-        chunk, objs, objects.Skeleton, 'path', 7, 7, 0.1, 0.1,
+        chunk, objs, objects.Skeleton, 'path', 7, 7, self._skeleton_spawn_prob, 0.1,
         lambda pos: objects.Skeleton(self._world, pos, self._player),
         lambda num, space: (0 if space < 6 else 1, 2))
     self._balance_object(

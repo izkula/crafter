@@ -26,6 +26,8 @@ def main():
   parser.add_argument('--wait', type=boolean, default=False)
   parser.add_argument('--death', type=str, default='reset', choices=[
       'continue', 'reset', 'quit'])
+  parser.add_argument('--zombie', type=float, default=0.3)
+  parser.add_argument('--skeleton', type=float, default=0.1)
   args = parser.parse_args()
 
   keymap = {
@@ -60,7 +62,8 @@ def main():
   size[1] = size[1] or args.window[1]
 
   env = crafter.Env(
-      area=args.area, view=args.view, length=args.length, seed=args.seed)
+      area=args.area, view=args.view, length=args.length, seed=args.seed,
+      zombie_spawn_prob=args.zombie, skeleton_spawn_prob=args.skeleton)
   env = crafter.Recorder(env, args.record)
   env.reset()
   achievements = set()
