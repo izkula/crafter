@@ -4,25 +4,70 @@ import pathlib
 
 import imageio
 import numpy as np
-
+from collections import defaultdict
 
 class Recorder:
 
   def __init__(
       self, env, directory, save_stats=True, save_video=True,
-      save_episode=True, video_size=(512, 512)):
+      save_episode=True, video_size=(512, 512),
+      save_inventory=True):
     if directory and save_stats:
       env = StatsRecorder(env, directory)
     if directory and save_video:
       env = VideoRecorder(env, directory, video_size)
     if directory and save_episode:
       env = EpisodeRecorder(env, directory)
+    if directory and save_inventory:
+      env = InventoryRecorder(env, directory)
     self._env = env
 
   def __getattr__(self, name):
     if name.startswith('__'):
       raise AttributeError(name)
     return getattr(self._env, name)
+
+class InventoryRecorder:
+
+  def __init__(self, env, directory):
+    self._env = env
+    self._directory = pathlib.Path(directory).expanduser()
+    self._directory.mkdir(exist_ok=True, parents=True)
+    self._file = (self._directory / 'inventory.jsonl').open('a')
+    self._length = None
+    self._reward = None
+    self._unlocked = None
+    self._inventory = defaultdict(list)
+
+  def __getattr__(self, name):
+    if name.startswith('__'):
+      raise AttributeError(name)
+    return getattr(self._env, name)
+
+  def reset(self):
+    obs = self._env.reset()
+    self._length = 0
+    self._reward = 0
+    self._unlocked = None
+    self._inventory = defaultdict(list)
+    return obs
+
+  def step(self, action):
+    obs, reward, done, info = self._env.step(action)
+    for key, value in info['inventory'].items():
+      self._inventory[key].append(value)
+    self._length += 1
+    self._reward += info['reward']
+    if done:
+      self._inventory = dict(self._inventory)
+      self._inventory['length'] = self._length
+      self._inventory['reward'] = round(self._reward, 1)
+      self._save()
+    return obs, reward, done, info
+
+  def _save(self):
+    self._file.write(json.dumps(self._inventory) + '\n')
+    self._file.flush()
 
 
 class StatsRecorder:

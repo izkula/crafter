@@ -5,12 +5,13 @@ import numpy as np
 # env = gym.make('CrafterReward-v1')  # Or CrafterNoReward-v1
 env = crafter.Env(
     seed=1,
-    zombie_spawn_prob=0, skeleton_spawn_prob=0)
+    zombie_spawn_prob=1, skeleton_spawn_prob=1)
 env = crafter.Recorder(
   env, '~/logdir/crafter/',
   save_stats=True,
   save_video=False,
   save_episode=False,
+  save_inventory=True,
 )
 
 obs = env.reset()

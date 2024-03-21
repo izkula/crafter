@@ -40,6 +40,7 @@ class Env(BaseClass):
     self._episode = 0
     self._zombie_spawn_prob = zombie_spawn_prob
     self._skeleton_spawn_prob = skeleton_spawn_prob
+    print(f'>>> zombie_spawn_prob={zombie_spawn_prob}, skeleton_spawn_prob={skeleton_spawn_prob}')
     self._world = engine.World(area, constants.materials, (12, 12))
     self._textures = engine.Textures(constants.root / 'assets')
     item_rows = int(np.ceil(len(constants.items) / view[0]))
