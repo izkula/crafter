@@ -27,7 +27,10 @@ class Env(BaseClass):
   def __init__(
       self, area=(64, 64), view=(9, 9), size=(64, 64),
       reward=True, length=10000, seed=None,
-      zombie_spawn_prob=0.3, skeleton_spawn_prob=0.1):
+      zombie_spawn_prob=0.3, skeleton_spawn_prob=0.1,
+      unlock_reward_enabled=True,
+      alive_reward_slope=0, alive_reward_intercept=0,
+      homeostatic_reward_scale=0, homeostatic_reward_threshold=5):
     view = np.array(view if hasattr(view, '__len__') else (view, view))
     size = np.array(size if hasattr(size, '__len__') else (size, size))
     seed = np.random.randint(0, 2**31 - 1) if seed is None else seed
@@ -41,6 +44,13 @@ class Env(BaseClass):
     self._zombie_spawn_prob = zombie_spawn_prob
     self._skeleton_spawn_prob = skeleton_spawn_prob
     print(f'>>> zombie_spawn_prob={zombie_spawn_prob}, skeleton_spawn_prob={skeleton_spawn_prob}')
+
+    self.unlock_reward_enabled = unlock_reward_enabled
+    self.alive_reward_slope = alive_reward_slope
+    self.alive_reward_intercept = alive_reward_intercept
+    self.homeostatic_reward_scale = homeostatic_reward_scale
+    self.homeostatic_reward_threshold = homeostatic_reward_threshold
+
     self._world = engine.World(area, constants.materials, (12, 12))
     self._textures = engine.Textures(constants.root / 'assets')
     item_rows = int(np.ceil(len(constants.items) / view[0]))
@@ -106,7 +116,11 @@ class Env(BaseClass):
         if count > 0 and name not in self._unlocked}
     if unlocked:
       self._unlocked |= unlocked
-      reward += 1.0
+      if self.unlock_rewards_enabled:
+        reward += 1.0
+    if self.alive_reward_slope or self.alive_reward_intercept:
+      reward += self.alive_reward_slope * self._step + self.alive_reward_intercept
+
     dead = self._player.health <= 0
     over = self._length and self._step >= self._length
     done = dead or over
@@ -171,7 +185,7 @@ class Env(BaseClass):
       xs = np.tile(np.arange(xmin, xmax)[:, None], [1, ymax - ymin])
       ys = np.tile(np.arange(ymin, ymax)[None, :], [xmax - xmin, 1])
       xs, ys = xs[mask], ys[mask]
-      i = random.randint(0, len(xs))
+      i = raunlock_rewardsndom.randint(0, len(xs))
       pos = np.array((xs[i], ys[i]))
       empty = self._world[pos][1] is None
       away = self._player.distance(pos) >= span_dist
