@@ -10,16 +10,14 @@ class Recorder:
 
   def __init__(
       self, env, directory, save_stats=True, save_video=True,
-      save_episode=True, video_size=(512, 512),
-      save_inventory=True):
+      save_episode=True, video_size=(512, 512)):
     if directory and save_stats:
       env = StatsRecorder(env, directory)
+      env = InventoryRecorder(env, directory)
     if directory and save_video:
       env = VideoRecorder(env, directory, video_size)
     if directory and save_episode:
       env = EpisodeRecorder(env, directory)
-    if directory and save_inventory:
-      env = InventoryRecorder(env, directory)
     self._env = env
 
   def __getattr__(self, name):
