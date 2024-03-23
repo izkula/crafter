@@ -185,7 +185,7 @@ class Env(BaseClass):
       xs = np.tile(np.arange(xmin, xmax)[:, None], [1, ymax - ymin])
       ys = np.tile(np.arange(ymin, ymax)[None, :], [xmax - xmin, 1])
       xs, ys = xs[mask], ys[mask]
-      i = raunlock_rewardsndom.randint(0, len(xs))
+      i = random.randint(0, len(xs))
       pos = np.array((xs[i], ys[i]))
       empty = self._world[pos][1] is None
       away = self._player.distance(pos) >= span_dist
