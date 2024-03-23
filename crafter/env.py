@@ -28,9 +28,10 @@ class Env(BaseClass):
       self, area=(64, 64), view=(9, 9), size=(64, 64),
       reward=True, length=10000, seed=None,
       zombie_spawn_prob=0.3, skeleton_spawn_prob=0.1,
-      unlock_reward_enabled=True,
+      unlock_rewards_enabled=True,
       alive_reward_slope=0, alive_reward_intercept=0,
-      homeostatic_reward_scale=0, homeostatic_reward_threshold=5):
+      #homeostatic_reward_scale=0, homeostatic_reward_threshold=5
+      ):
     view = np.array(view if hasattr(view, '__len__') else (view, view))
     size = np.array(size if hasattr(size, '__len__') else (size, size))
     seed = np.random.randint(0, 2**31 - 1) if seed is None else seed
@@ -45,11 +46,11 @@ class Env(BaseClass):
     self._skeleton_spawn_prob = skeleton_spawn_prob
     print(f'>>> zombie_spawn_prob={zombie_spawn_prob}, skeleton_spawn_prob={skeleton_spawn_prob}')
 
-    self.unlock_reward_enabled = unlock_reward_enabled
+    self.unlock_rewards_enabled = unlock_rewards_enabled
     self.alive_reward_slope = alive_reward_slope
     self.alive_reward_intercept = alive_reward_intercept
-    self.homeostatic_reward_scale = homeostatic_reward_scale
-    self.homeostatic_reward_threshold = homeostatic_reward_threshold
+    # self.homeostatic_reward_scale = homeostatic_reward_scale
+    # self.homeostatic_reward_threshold = homeostatic_reward_threshold
 
     self._world = engine.World(area, constants.materials, (12, 12))
     self._textures = engine.Textures(constants.root / 'assets')
