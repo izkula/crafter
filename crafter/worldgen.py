@@ -8,7 +8,8 @@ from . import objects
 
 
 def generate_world(world, player,
-                   zombie_spawn_prob, skeleton_spawn_prob):
+                   zombie_spawn_prob, skeleton_spawn_prob,
+                   initial_cow_spawn_scale, stationary_cows):
   simplex = opensimplex.OpenSimplex(seed=world.random.randint(0, 2 ** 31 - 1))
   tunnels = np.zeros(world.area, bool)
   for x in range(world.area[0]):
@@ -17,7 +18,7 @@ def generate_world(world, player,
   for x in range(world.area[0]):
     for y in range(world.area[1]):
       _set_object(world, (x, y), player, tunnels,
-                  zombie_spawn_prob, skeleton_spawn_prob)
+                  zombie_spawn_prob, skeleton_spawn_prob, initial_cow_spawn_scale, stationary_cows)
 
 
 def _set_material(world, pos, player, tunnels, simplex):
@@ -64,15 +65,15 @@ def _set_material(world, pos, player, tunnels, simplex):
 
 
 def _set_object(world, pos, player, tunnels,
-                zombie_spawn_prob, skeleton_spawn_prob):
+                zombie_spawn_prob, skeleton_spawn_prob, initial_cow_spawn_scale, stationary_cows):
   x, y = pos
   uniform = world.random.uniform
   dist = np.sqrt((x - player.pos[0]) ** 2 + (y - player.pos[1]) ** 2)
   material, _ = world[x, y]
   if material not in constants.walkable:
     pass
-  elif dist > 3 and material == 'grass' and uniform() > 0.985:
-    world.add(objects.Cow(world, (x, y)))
+  elif dist > 3 and material == 'grass' and uniform() > (0.985 + 0.015 * (1 - initial_cow_spawn_scale)):
+    world.add(objects.Cow(world, (x, y), stationary_cows))
   elif dist > 10 and uniform() > (0.993+0.007*(1-zombie_spawn_prob)):
     world.add(objects.Zombie(world, (x, y), player))
   elif material == 'path' and tunnels[x, y] and uniform() > (0.95+0.05*(1-skeleton_spawn_prob)):
