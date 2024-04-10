@@ -97,12 +97,15 @@ class Player(Object):
     return constants.walkable + ['lava']
 
   def update(self):
+    aux_info = {}
     target = (self.pos[0] + self.facing[0], self.pos[1] + self.facing[1])
     material, obj = self.world[target]
     action = self.action
+    forced_sleep = False
     if self.sleeping:
       if self.inventory['energy'] < constants.items['energy']['max']:
         action = 'sleep'
+        forced_sleep = True
       else:
         self.sleeping = False
         self.achievements['wake_up'] += 1
@@ -111,10 +114,14 @@ class Player(Object):
     elif action.startswith('move_'):
       self._move(action[len('move_'):])
     elif action == 'do' and obj:
-      self._do_object(obj)
+      aux_info |= self._do_object(obj)
     elif action == 'do':
-      self._do_material(target, material)
+      aux_info |= self._do_material(target, material)
     elif action == 'sleep':
+      if not forced_sleep:
+        aux_info['sleep'] = (self.inventory['food'],
+                             self.inventory['drink'],
+                             self.inventory['energy'])
       if self.inventory['energy'] < constants.items['energy']['max']:
         self.sleeping = True
     elif action.startswith('place_'):
@@ -129,6 +136,7 @@ class Player(Object):
     # This needs to happen after the inventory states are clamped
     # because it involves the health water inventory count.
     self._wake_up_when_hurt()
+    return aux_info
 
   def _update_life_stats(self):
     self._hunger += 0.5 if self.sleeping else 1
@@ -179,6 +187,7 @@ class Player(Object):
       self.health = 0
 
   def _do_object(self, obj):
+    aux_info = {}
     damage = max([
         1,
         self.inventory['wood_sword'] and 2,
@@ -187,6 +196,9 @@ class Player(Object):
     ])
     if isinstance(obj, Plant):
       if obj.ripe:
+        aux_info['eat'] = (self.inventory['food'],
+                           self.inventory['drink'],
+                           self.inventory['energy'])
         obj.grown = 0
         self.inventory['food'] += 4
         self.achievements['eat_plant'] += 1
@@ -205,28 +217,37 @@ class Player(Object):
     if isinstance(obj, Cow):
       obj.health -= damage
       if obj.health <= 0:
+        aux_info['eat'] = (self.inventory['food'],
+                           self.inventory['drink'],
+                           self.inventory['energy'])
         self.inventory['food'] += 6
         self.achievements['eat_cow'] += 1
         # TODO: Keep track of previous inventory state to do this in a more
         # general way.
         self._hunger = 0
+    return aux_info
 
   def _do_material(self, target, material):
+    aux_info = {}
     if material == 'water':
+      aux_info['drink'] = (self.inventory['food'],
+                           self.inventory['drink'],
+                           self.inventory['energy'])
       # TODO: Keep track of previous inventory state to do this in a more
       # general way.
       self._thirst = 0
     info = constants.collect.get(material)
     if not info:
-      return
+      return aux_info
     for name, amount in info['require'].items():
       if self.inventory[name] < amount:
-        return
+        return aux_info
     self.world[target] = info['leaves']
     if self.random.uniform() <= info.get('probability', 1):
       for name, amount in info['receive'].items():
         self.inventory[name] += amount
         self.achievements[f'collect_{name}'] += 1
+    return aux_info
 
   def _place(self, name, target, material):
     if self.world[target][1]:
@@ -263,9 +284,10 @@ class Player(Object):
 
 class Cow(Object):
 
-  def __init__(self, world, pos):
+  def __init__(self, world, pos, stationary=False):
     super().__init__(world, pos)
     self.health = 3
+    self.stationary = stationary
 
   @property
   def texture(self):
@@ -276,7 +298,8 @@ class Cow(Object):
       self.world.remove(self)
     if self.random.uniform() < 0.5:
       direction = self.random_dir()
-      self.move(direction)
+      if not self.stationary:
+        self.move(direction)
 
 
 class Zombie(Object):

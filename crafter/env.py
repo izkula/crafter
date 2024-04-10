@@ -7,7 +7,6 @@ from . import engine
 from . import objects
 from . import worldgen
 
-
 # Gym is an optional dependency.
 try:
   import gym
@@ -27,7 +26,12 @@ class Env(BaseClass):
   def __init__(
       self, area=(64, 64), view=(9, 9), size=(64, 64),
       reward=True, length=10000, seed=None,
-      zombie_spawn_prob=0.3, skeleton_spawn_prob=0.1):
+      zombie_spawn_prob=0.3, skeleton_spawn_prob=0.1,
+      unlock_rewards_enabled=True,
+      alive_reward_slope=0, alive_reward_intercept=0,
+      homeostatic_reward_scale=0, homeostatic_reward_threshold=0,
+      stationary_cows=False, incremental_cow_spawn_scale=1, initial_cow_spawn_scale=1,
+      ):
     view = np.array(view if hasattr(view, '__len__') else (view, view))
     size = np.array(size if hasattr(size, '__len__') else (size, size))
     seed = np.random.randint(0, 2**31 - 1) if seed is None else seed
@@ -41,6 +45,16 @@ class Env(BaseClass):
     self._zombie_spawn_prob = zombie_spawn_prob
     self._skeleton_spawn_prob = skeleton_spawn_prob
     print(f'>>> zombie_spawn_prob={zombie_spawn_prob}, skeleton_spawn_prob={skeleton_spawn_prob}')
+
+    self._unlock_rewards_enabled = unlock_rewards_enabled
+    self._alive_reward_slope = alive_reward_slope
+    self._alive_reward_intercept = alive_reward_intercept
+    self._homeostatic_reward_scale = homeostatic_reward_scale
+    self._homeostatic_reward_threshold = homeostatic_reward_threshold
+    self._stationary_cows = stationary_cows
+    self._initial_cow_spawn_scale = initial_cow_spawn_scale
+    self._incremental_cow_spawn_scale = incremental_cow_spawn_scale
+
     self._world = engine.World(area, constants.materials, (12, 12))
     self._textures = engine.Textures(constants.root / 'assets')
     item_rows = int(np.ceil(len(constants.items) / view[0]))
@@ -82,16 +96,30 @@ class Env(BaseClass):
     self._world.add(self._player)
     self._unlocked = set()
     worldgen.generate_world(self._world, self._player,
-                            self._zombie_spawn_prob, self._skeleton_spawn_prob)
+                            self._zombie_spawn_prob, self._skeleton_spawn_prob,
+                            self._initial_cow_spawn_scale, self._stationary_cows)
     return self._obs()
 
   def step(self, action):
     self._step += 1
     self._update_time()
     self._player.action = constants.actions[action]
+    reward = 0.0
     for obj in self._world.objects:
       if self._player.distance(obj) < 2 * max(self._view):
-        obj.update()
+        aux_info = obj.update()
+        if aux_info:
+          # assert len(aux_info) == 1
+          key = next(iter(aux_info))
+          food, drink, energy = aux_info[key]
+          lowest_resource = min(food, drink, energy)
+          if lowest_resource > self._homeostatic_reward_threshold:
+            continue
+          if ((key == 'eat' and food == lowest_resource)
+            or (key == 'drink' and drink == lowest_resource)
+            or (key == 'sleep' and energy == lowest_resource)):
+              reward += self._homeostatic_reward_scale
+
     if self._step % 10 == 0:
       for chunk, objs in self._world.chunks.items():
         # xmin, xmax, ymin, ymax = chunk
@@ -99,14 +127,18 @@ class Env(BaseClass):
         # if self._player.distance(center) < 4 * max(self._view):
         self._balance_chunk(chunk, objs)
     obs = self._obs()
-    reward = (self._player.health - self._last_health) / 10
+    reward += (self._player.health - self._last_health) / 10
     self._last_health = self._player.health
     unlocked = {
         name for name, count in self._player.achievements.items()
         if count > 0 and name not in self._unlocked}
     if unlocked:
       self._unlocked |= unlocked
-      reward += 1.0
+      if self._unlock_rewards_enabled:
+        reward += 1.0
+    if self._alive_reward_slope or self._alive_reward_intercept:
+      reward += self._alive_reward_slope * self._step + self._alive_reward_intercept
+
     dead = self._player.health <= 0
     over = self._length and self._step >= self._length
     done = dead or over
@@ -155,8 +187,8 @@ class Env(BaseClass):
         lambda pos: objects.Skeleton(self._world, pos, self._player),
         lambda num, space: (0 if space < 6 else 1, 2))
     self._balance_object(
-        chunk, objs, objects.Cow, 'grass', 5, 5, 0.01, 0.1,
-        lambda pos: objects.Cow(self._world, pos),
+        chunk, objs, objects.Cow, 'grass', 5, 5, 0.01 * self._incremental_cow_spawn_scale, 0.1,
+        lambda pos: objects.Cow(self._world, pos, self._stationary_cows),
         lambda num, space: (0 if space < 30 else 1, 1.5 + light))
 
   def _balance_object(
